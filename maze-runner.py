@@ -12,6 +12,9 @@ class BrenttMap:
     def __init__(self):
         self.level = '1'
 
+    def get_start(self):
+        return Room(0, 0, rtype="@", path=tuple())
+
     def get_levels(self):
         return ('1', '2', '3', '4', '5', '6', '7')
 
@@ -32,13 +35,32 @@ class BrenttMap:
             
 
 class PNGMap:
-    def __init__(self, image_path, start, wall_width=2, room_width=14):
+    def __init__(self, image_path, wall_width=2, room_width=14):
         self.image_path = image_path
-        self.start = start
         self.wall_width = wall_width
         self.room_width = room_width
         self.wall_middle = self.wall_width + (self.room_width / 2)
         self.cell_size = room_width + wall_width
+        self.start = None
+   
+    def get_start(self):
+        if self.start:
+            return self.start
+        
+        y = 0
+        x = 0
+        img_x = 0
+        # walk along the top of the map and find the entry point
+        while img_x < self.max_size[0]:
+            walls = self.get_walls((x, y))
+            if not walls[0]:
+                self.start = Room(x, y, rtype="@", path=tuple())
+                return self.start
+            x += 1
+            img_x += self.cell_size
+
+        self.start = Room(0, 0, rtype="@", path=tuple())
+        return self.start
 
     def get_levels(self):
         return ("/Users/wbustraa/Downloads/20 by 20 orthogonal maze.png",
@@ -111,7 +133,7 @@ class PNGMap:
         return (wall_n, wall_e, wall_w, wall_s)
 
     def check_path(self, path):
-        room = self.start
+        room = (self.start.x, self.start.y)
         for d in path:
             if d == "N":
                 walls = self.get_walls(room)
@@ -204,7 +226,7 @@ class MazeRunner:
 
         q = queue()
 
-        start = Room(0, 0, rtype="@", path=tuple())
+        start = self.map.get_start()
         q.append(start)
 
         visited = set()
@@ -306,8 +328,8 @@ class MazeRunner:
         print(f"Level {level} ", result)    
 
 def main(argv):
-    #map = PNGMap("/Users/wbustraa/Downloads/40 by 20 orthogonal maze.png", (0,0))
-    map = BrenttMap()
+    map = PNGMap("/Users/wbustraa/Downloads/40 by 20 orthogonal maze.png")
+    #map = BrenttMap()
     runner = MazeRunner(map)
     runner.show()
 
