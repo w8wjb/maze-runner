@@ -23,7 +23,6 @@ class BrenttMap:
 
     def check_path(self, path):
         url = MAZE_LEVEL_BASE_URL + self.level
-        print(path)
 
         for retry in range(3):
             try:
@@ -210,12 +209,12 @@ class MazeRunner:
 
         shortest_found = False
 
+        dirs = ["N", "E", "W", "S"]
+
         while q:
             room = q.popleft()
 
             visited[room.x][room.y] = room
-
-            dirs = ["N", "E", "W", "S"]
 
             for d in dirs:
                 neighbor = room.neighbor(d)
