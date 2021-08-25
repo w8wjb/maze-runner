@@ -4,7 +4,7 @@ import requests
 import sys
 import tkinter
 from tkinter import ttk
-
+from PIL import Image
 
 MAZE_LEVEL_BASE_URL = "https://brentts-maze-runner.herokuapp.com//mazerunner/"
 
@@ -12,28 +12,160 @@ m = 100
 n = 100
 
 class BrenttMap:
-    def check_path(self, level, path):
-        url = MAZE_LEVEL_BASE_URL + str(level)
-        response = requests.put(url, json=path)
-        return response.text
+    def __init__(self):
+        self.level = '1'
+
+    def get_levels(self):
+        return ('1', '2', '3', '4', '5', '6', '7')
+
+    def set_level(self, level):
+        self.level = level
+
+    def check_path(self, path):
+        url = MAZE_LEVEL_BASE_URL + self.level
+        print(path)
+
+        for retry in range(3):
+            try:
+                response = requests.put(url, json=path)
+                return response.text
+            except ConnectionResetError:
+                print("Connection reset, retrying")
+                continue
+        print("Connection failed")
+            
+
+class PNGMap:
+    def __init__(self, image_path, start, wall_width=2, room_width=14):
+        self.image_path = image_path
+        self.start = start
+        self.wall_width = wall_width
+        self.room_width = room_width
+        self.wall_middle = self.wall_width + (self.room_width / 2)
+        self.cell_size = room_width + wall_width
+
+    def get_levels(self):
+        return ("/Users/wbustraa/Downloads/20 by 20 orthogonal maze.png",
+        "/Users/wbustraa/Downloads/40 by 20 orthogonal maze.png")
+
+    def set_level(self, level):
+        self.level = level
+        self.image = Image.open(self.level).convert('L') # L == Luma
+        self.max_size = self.image.size
+
+    def in_bounds(self, xy):
+        if xy[0] < 0 \
+            or xy[0] > self.max_size[0] \
+            or xy[1] < 0 \
+            or xy[1] > self.max_size[1]:
+            return False
+        return True
 
 
-class Node:
-    def __init__(self, x: int, y: int, path: tuple):
+    def get_walls(self, roomxy):
+
+        rx, ry = roomxy
+        cell_x1 = self.cell_size * rx
+        cell_y1 = self.cell_size * ry
+
+        if not self.in_bounds((cell_x1, cell_y1)):
+            return (True, True, True, True)
+
+        ny = cell_y1
+        ex = cell_x1 + self.wall_width + self.room_width
+        wx = cell_x1
+        sy = cell_y1 + self.wall_width + self.room_width
+
+        if ny < 0:
+            wall_n = True
+        else:
+            n = (wx + self.wall_middle, ny)
+            if self.in_bounds(n):
+                wall_n = self.image.getpixel(n) < 128
+            else:
+                wall_n = None
+
+        if ex > self.max_size[0]:
+            wall_e = True
+        else:
+            e = (ex, ny + self.wall_middle)
+            if self.in_bounds(e):
+                wall_e = self.image.getpixel(e) < 128
+            else:
+                wall_e = None
+
+        if wx < 0:
+            wall_w = True
+        else:
+            w = (wx, ny + self.wall_middle)
+            if self.in_bounds(w):
+                wall_w = self.image.getpixel(w) < 128
+            else:
+                wall_w = None
+
+        if sy > self.max_size[1]:
+            wall_s = True
+        else:
+            s = (wx + self.wall_middle, sy)
+            if self.in_bounds(s):
+                wall_s = self.image.getpixel(s) < 128
+            else:
+                wall_s = None
+
+        return (wall_n, wall_e, wall_w, wall_s)
+
+    def check_path(self, path):
+        room = self.start
+        for d in path:
+            if d == "N":
+                walls = self.get_walls(room)
+                if walls[0] is None:
+                    return "Exit"
+                if walls[0]:
+                    return "Wall"
+                room = (room[0], room[1] - 1)
+            elif d == "E":
+                walls = self.get_walls(room)
+                if walls[1] is None:
+                    return "Exit"
+                if walls[1]:
+                    return "Wall"
+                room = (room[0] + 1, room[1])
+            elif d == "W":
+                walls = self.get_walls(room)
+                if walls[2] is None:
+                    return "Exit"
+                if walls[2]:
+                    return "Wall"
+                room = (room[0] - 1, room[1])
+            elif d == "S":
+                walls = self.get_walls(room)
+                if walls[3] is None:
+                    return "Exit"
+                if walls[3]:
+                    return "Wall"
+                room = (room[0], room[1] + 1)
+        return "Open Space"
+
+class Room:
+    def __init__(self, x: int, y: int, rtype = "_", path: tuple = ()):
         super().__init__()
         self.x = x
         self.y = y
+        self.rtype = rtype
+        self.walls = {"N": None, "E": None, "W": None, "S": None}
         self.path = path
 
     def neighbor(self, direction):
         if direction == "N":
-            return Node(self.x, self.y - 1, self.path + (direction,) )
+            return Room(self.x, self.y - 1, path = self.path + (direction,) )
         elif direction == "E":
-            return Node(self.x + 1, self.y, self.path + (direction,) )
+            return Room(self.x + 1, self.y, path = self.path + (direction,) )
         elif direction == "W":
-            return Node(self.x - 1, self.y, self.path + (direction,) )
+            return Room(self.x - 1, self.y, path = self.path + (direction,) )
         else:
-            return Node(self.x, self.y + 1, self.path + (direction,) )
+            return Room(self.x, self.y + 1, path = self.path + (direction,) )
+
 
 
 class MazeRunner:
@@ -45,12 +177,12 @@ class MazeRunner:
     def show(self):
         self.root = tkinter.Tk()
         self.root.title('Maze Runner')
-        self.canvas = tkinter.Canvas(self.root, bg="white", height=300, width=300)
+        self.canvas = tkinter.Canvas(self.root, bg="white", height=500, width=1000)
         self.canvas.pack(fill=tkinter.BOTH, expand=tkinter.YES)
 
         self.btn_frame = ttk.Frame(self.root)
 
-        levels = ('1', '2', '3', '4', '5', '6', '7')
+        levels = self.map.get_levels()
         self.level_chooser = ttk.Combobox(self.btn_frame, width=2, textvariable=self.level, value=levels, state='readonly')
         self.level_chooser.current(0)
         self.level_chooser.pack(side = tkinter.LEFT, padx=10)
@@ -65,30 +197,11 @@ class MazeRunner:
 
         self.root.mainloop()
 
-    def draw_node(self, node, node_type):
-        tlx = node.x * self.scale
-        tly = node.y * self.scale
-        brx = tlx + self.scale
-        bry = tly + self.scale
-        if node.x == 0 and node.y == 0:
-            self.canvas.create_rectangle(tlx, tly, brx, bry, fill="green")
-        elif node_type == "#":
-            self.canvas.create_rectangle(tlx, tly, brx, bry, fill="black")
-        elif node_type == "X":
-            self.canvas.create_rectangle(tlx, tly, brx, bry, fill="red")
-        elif node_type == "_":
-            self.canvas.create_rectangle(tlx, tly, brx, bry, fill="white")
-        elif node_type == "P":
-            self.canvas.create_rectangle(tlx, tly, brx, bry, fill="PaleGreen1")
-        self.canvas.update_idletasks()
-        self.canvas.update()
-        
-
     def breadth_first_search(self, level):
 
         q = queue()
 
-        start = Node(0, 0, tuple())
+        start = Room(0, 0, rtype="@", path=tuple())
         q.append(start)
 
         visited = [[None for x in range(n)] for x in range(m)]
@@ -97,35 +210,34 @@ class MazeRunner:
 
         shortest_found = False
 
+        room_count = 0
         while q:
-            node = q.popleft()
+            room = q.popleft()
 
-            visited[node.x][node.y] = "_"
-            self.draw_node(node, "_")
+            visited[room.x][room.y] = room
 
-            dirs = ["E", "S"]
-            if node.y > 0:
-                dirs.append("N")
-            if node.x > 0:
-                dirs.append("W")
+            dirs = ["N", "E", "W", "S"]
 
             for d in dirs:
-                neighbor = node.neighbor(d)
+                neighbor = room.neighbor(d)
 
                 if visited[neighbor.x][neighbor.y]:
                     continue
 
-                valid = self.map.check_path(level, neighbor.path)
+                valid = self.map.check_path(neighbor.path)
+                # valid = neighbor.check_path(level)
 
                 if valid == "Open Space":
+                    room.walls[d] = False
                     q.append(neighbor)
                 elif valid == "Wall":
-                    visited[neighbor.x][neighbor.y] = "#"
-                    self.draw_node(neighbor, "#")
+                    room.walls[d] = True
+                    # visited[neighbor.x][neighbor.y] = "#"
+                    # draw_room(canvas, neighbor, "#")
                     continue
                 else:
-                    visited[neighbor.x][neighbor.y] = "X"
-                    self.draw_node(neighbor, "X")
+                    room.rtype = "X"
+                    # draw_room(canvas, neighbor, "X")
                     print(valid)
                     exits.append(neighbor.path)
 
@@ -134,21 +246,78 @@ class MazeRunner:
 
                         last = start
                         for step in neighbor.path[:-1]:
-                            next = last.neighbor(step)
-                            self.draw_node(next, "P")
-                            last = next
+                            if last.x == 0 and last.y == 0:
+                                last = last.neighbor(step)
+                                continue
+                            last.rtype = step
+                            self.draw_room(last)
+                            last = last.neighbor(step)
 
+
+
+                    # return neighbor.path
+
+            # print((room.x, room.y, room.walls))
+
+
+            self.draw_room(room)
+            room_count += 1
+            # if room_count >= 50:
+            #     break
 
         return exits
+    def draw_room(self, room):
+        tlx = room.x * self.scale
+        tly = room.y * self.scale
+        brx = tlx + self.scale
+        bry = tly + self.scale
+
+        self.canvas.width = 600
+
+        if room.rtype == "@":
+            self.canvas.create_rectangle(tlx, tly, brx, bry, fill="green")
+        elif room.rtype == "#":
+            self.canvas.create_rectangle(tlx, tly, brx, bry, fill="black")
+        elif room.rtype == "X":
+            self.canvas.create_rectangle(tlx, tly, brx, bry, fill="red", outline="")
+        elif room.rtype == "N":
+            self.canvas.create_oval(tlx+1, tly+1, brx-2, bry-2, fill="SpringGreen3", outline="")
+            self.canvas.create_text(tlx+10, tly+10, text="▲", fill="dark green", font=("Helvetica", 12))
+        elif room.rtype == "E":
+            self.canvas.create_oval(tlx+1, tly+1, brx-2, bry-2, fill="SpringGreen3", outline="")
+            self.canvas.create_text(tlx+10, tly+10, text="▶", fill="dark green", font=("Helvetica", 12))
+        elif room.rtype == "W":
+            self.canvas.create_oval(tlx+1, tly+1, brx-2, bry-2, fill="SpringGreen3", outline="")
+            self.canvas.create_text(tlx+10, tly+10, text="◀", fill="dark green", font=("Helvetica", 12))
+        elif room.rtype == "S":
+            self.canvas.create_oval(tlx+1, tly+1, brx-2, bry-2, fill="SpringGreen3", outline="")
+            self.canvas.create_text(tlx+10, tly+10, text="▼", fill="dark green", font=("Helvetica", 12))
+        else:
+            self.canvas.create_rectangle(tlx+1, tly+1, brx-2, bry-2, fill="white", outline="")            
+            if room.walls['N']:
+                self.canvas.create_line(tlx, tly, brx, tly, width=2)
+            if room.walls['E']:
+                self.canvas.create_line(brx, tly, brx, bry, width=2)
+            if room.walls['W']:
+                self.canvas.create_line(tlx, tly, tlx, bry, width=2)
+            if room.walls['S']:
+                self.canvas.create_line(tlx, bry, brx, bry, width=2)
+
+        
+        self.canvas.update_idletasks()
+        self.canvas.update()
 
     def start_mapping(self):
         self.canvas.delete("all")
-        level = int(self.level_chooser.get())
+        level = self.level_chooser.get()
+        self.map.set_level(level)
         result = self.breadth_first_search(level)
         print(f"Level {level} ", result)    
 
 def main(argv):
-    runner = MazeRunner(BrenttMap())
+    #map = PNGMap("/Users/wbustraa/Downloads/40 by 20 orthogonal maze.png", (0,0))
+    map = BrenttMap()
+    runner = MazeRunner(map)
     runner.show()
 
 if __name__ == "__main__":
