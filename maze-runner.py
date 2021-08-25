@@ -177,7 +177,7 @@ class MazeRunner:
     def show(self):
         self.root = tkinter.Tk()
         self.root.title('Maze Runner')
-        self.canvas = tkinter.Canvas(self.root, bg="white", height=500, width=1000)
+        self.canvas = tkinter.Canvas(self.root, bg="grey", height=500, width=1000)
         self.canvas.pack(fill=tkinter.BOTH, expand=tkinter.YES)
 
         self.btn_frame = ttk.Frame(self.root)
@@ -210,7 +210,6 @@ class MazeRunner:
 
         shortest_found = False
 
-        room_count = 0
         while q:
             room = q.popleft()
 
@@ -225,19 +224,15 @@ class MazeRunner:
                     continue
 
                 valid = self.map.check_path(neighbor.path)
-                # valid = neighbor.check_path(level)
 
                 if valid == "Open Space":
                     room.walls[d] = False
                     q.append(neighbor)
                 elif valid == "Wall":
                     room.walls[d] = True
-                    # visited[neighbor.x][neighbor.y] = "#"
-                    # draw_room(canvas, neighbor, "#")
                     continue
                 else:
                     room.rtype = "X"
-                    # draw_room(canvas, neighbor, "X")
                     print(valid)
                     exits.append(neighbor.path)
 
@@ -254,18 +249,10 @@ class MazeRunner:
                             last = last.neighbor(step)
 
 
-
-                    # return neighbor.path
-
-            # print((room.x, room.y, room.walls))
-
-
             self.draw_room(room)
-            room_count += 1
-            # if room_count >= 50:
-            #     break
 
         return exits
+
     def draw_room(self, room):
         tlx = room.x * self.scale
         tly = room.y * self.scale
@@ -293,7 +280,8 @@ class MazeRunner:
             self.canvas.create_oval(tlx+1, tly+1, brx-2, bry-2, fill="SpringGreen3", outline="")
             self.canvas.create_text(tlx+10, tly+10, text="▼", fill="dark green", font=("Helvetica", 12))
         else:
-            self.canvas.create_rectangle(tlx+1, tly+1, brx-2, bry-2, fill="white", outline="")            
+            self.canvas.create_rectangle(tlx, tly, brx, bry, fill="white", outline="")
+            
             if room.walls['N']:
                 self.canvas.create_line(tlx, tly, brx, tly, width=2)
             if room.walls['E']:
