@@ -8,9 +8,6 @@ from PIL import Image
 
 MAZE_LEVEL_BASE_URL = "https://brentts-maze-runner.herokuapp.com//mazerunner/"
 
-m = 100
-n = 100
-
 class BrenttMap:
     def __init__(self):
         self.level = '1'
@@ -155,6 +152,13 @@ class Room:
         self.walls = {"N": None, "E": None, "W": None, "S": None}
         self.path = path
 
+    def __hash__(self):
+        return hash((self.x, self.y))
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)): return NotImplemented
+        return self.x == other.x and self.y == other.y
+
     def neighbor(self, direction):
         if direction == "N":
             return Room(self.x, self.y - 1, path = self.path + (direction,) )
@@ -203,7 +207,7 @@ class MazeRunner:
         start = Room(0, 0, rtype="@", path=tuple())
         q.append(start)
 
-        visited = [[None for x in range(n)] for x in range(m)]
+        visited = set()
 
         exits = []
 
@@ -214,12 +218,12 @@ class MazeRunner:
         while q:
             room = q.popleft()
 
-            visited[room.x][room.y] = room
+            visited.add(room)
 
             for d in dirs:
                 neighbor = room.neighbor(d)
 
-                if visited[neighbor.x][neighbor.y]:
+                if neighbor in visited:
                     continue
 
                 valid = self.map.check_path(neighbor.path)
