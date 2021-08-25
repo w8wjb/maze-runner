@@ -6,9 +6,11 @@ import tkinter
 from tkinter import ttk
 from PIL import Image
 
-MAZE_LEVEL_BASE_URL = "https://brentts-maze-runner.herokuapp.com//mazerunner/"
+
 
 class BrenttMap:
+    MAZE_LEVEL_BASE_URL = "https://brentts-maze-runner.herokuapp.com//mazerunner/"
+
     def __init__(self):
         self.level = '1'
 
@@ -22,7 +24,7 @@ class BrenttMap:
         self.level = level
 
     def check_path(self, path):
-        url = MAZE_LEVEL_BASE_URL + self.level
+        url = BrenttMap.MAZE_LEVEL_BASE_URL + self.level
 
         for retry in range(3):
             try:
@@ -328,8 +330,8 @@ class MazeRunner:
         print(f"Level {level} ", result)    
 
 def main(argv):
-    map = PNGMap("/Users/wbustraa/Downloads/40 by 20 orthogonal maze.png")
-    #map = BrenttMap()
+    #map = PNGMap("/Users/wbustraa/Downloads/40 by 20 orthogonal maze.png")
+    map = BrenttMap()
     runner = MazeRunner(map)
     runner.show()
 
