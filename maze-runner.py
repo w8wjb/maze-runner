@@ -28,6 +28,7 @@ class BrenttMap:
 
         for retry in range(3):
             try:
+                # print(url, path)
                 response = requests.put(url, json=path)
                 return response.text
             except ConnectionResetError:
@@ -184,14 +185,26 @@ class Room:
         return self.x == other.x and self.y == other.y
 
     def neighbor(self, direction):
+        new_path = self.path + (direction,)
         if direction == "N":
-            return Room(self.x, self.y - 1, path = self.path + (direction,) )
+            return Room(self.x, self.y - 1, path=new_path)
+        elif direction == "NE":            
+            return Room(self.x + 1, self.y - 1, path=new_path)
         elif direction == "E":
-            return Room(self.x + 1, self.y, path = self.path + (direction,) )
+            return Room(self.x + 1, self.y, path=new_path)
+        elif direction == "SE":
+            return Room(self.x + 1, self.y + 1, path=new_path)
+        elif direction == "S":
+            return Room(self.x, self.y + 1, path=new_path)
+        elif direction == "SW":
+            return Room(self.x - 1, self.y + 1, path=new_path)
         elif direction == "W":
-            return Room(self.x - 1, self.y, path = self.path + (direction,) )
+            return Room(self.x - 1, self.y, path=new_path)
+        elif direction == "NW":
+            return Room(self.x - 1, self.y - 1, path=new_path)
         else:
-            return Room(self.x, self.y + 1, path = self.path + (direction,) )
+            return None
+            
 
 
 
@@ -200,6 +213,17 @@ class MazeRunner:
         self.map = map
         self.scale = scale
         self.level = '1'
+        self.dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
+        self.arrows = {'N': 90,
+        'NE': 45,
+        'E': 0,
+        'SE': -45,
+        'S': -90,
+        'SW': -135,
+        'W': -180,
+        'NW': -225}
+
+
 
     def show(self):
         self.root = tkinter.Tk()
@@ -237,14 +261,12 @@ class MazeRunner:
 
         shortest_found = False
 
-        dirs = ["N", "E", "W", "S"]
-
         while q:
             room = q.popleft()
 
             visited.add(room)
 
-            for d in dirs:
+            for d in self.dirs:
                 neighbor = room.neighbor(d)
 
                 if neighbor in visited:
@@ -294,18 +316,10 @@ class MazeRunner:
             self.canvas.create_rectangle(tlx, tly, brx, bry, fill="black")
         elif room.rtype == "X":
             self.canvas.create_rectangle(tlx, tly, brx, bry, fill="red", outline="")
-        elif room.rtype == "N":
+        elif room.rtype in self.dirs:
             self.canvas.create_oval(tlx+1, tly+1, brx-2, bry-2, fill="SpringGreen3", outline="")
-            self.canvas.create_text(tlx+10, tly+10, text="▲", fill="dark green", font=("Helvetica", 12))
-        elif room.rtype == "E":
-            self.canvas.create_oval(tlx+1, tly+1, brx-2, bry-2, fill="SpringGreen3", outline="")
-            self.canvas.create_text(tlx+10, tly+10, text="▶", fill="dark green", font=("Helvetica", 12))
-        elif room.rtype == "W":
-            self.canvas.create_oval(tlx+1, tly+1, brx-2, bry-2, fill="SpringGreen3", outline="")
-            self.canvas.create_text(tlx+10, tly+10, text="◀", fill="dark green", font=("Helvetica", 12))
-        elif room.rtype == "S":
-            self.canvas.create_oval(tlx+1, tly+1, brx-2, bry-2, fill="SpringGreen3", outline="")
-            self.canvas.create_text(tlx+10, tly+10, text="▼", fill="dark green", font=("Helvetica", 12))
+            angle = self.arrows[room.rtype]
+            self.canvas.create_text(tlx+10, tly+10, text="➤", angle=angle, fill="dark green", font=("Helvetica", 12))
         else:
             self.canvas.create_rectangle(tlx, tly, brx, bry, fill="white", outline="")
             
