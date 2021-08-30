@@ -18,7 +18,7 @@ class BrenttMap:
         return Room(0, 0, rtype="@", path=tuple())
 
     def get_levels(self):
-        return ('1', '2', '3', '4', '5', '6', '7')
+        return ('1', '2', '3', '4', '5', '6', '7', '8')
 
     def set_level(self, level):
         self.level = level
@@ -28,7 +28,7 @@ class BrenttMap:
 
         for retry in range(3):
             try:
-                # print(url, path)
+                # print(path)
                 response = requests.put(url, json=path)
                 return response.text
             except ConnectionResetError:
@@ -169,7 +169,7 @@ class PNGMap:
         return "Open Space"
 
 class Room:
-    def __init__(self, x: int, y: int, rtype = "_", path: tuple = ()):
+    def __init__(self, x: int, y: int, rtype = "?", path: tuple = ()):
         super().__init__()
         self.x = x
         self.y = y
@@ -211,9 +211,12 @@ class Room:
 class MazeRunner:
     def __init__(self, map, scale = 20):
         self.map = map
+        self.thick_walls = True
         self.scale = scale
         self.level = '1'
+        self.secret_code = None
         self.dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
+        # self.dirs = ['N', 'E', 'S', 'W']
         self.arrows = {'N': 90,
         'NE': 45,
         'E': 0,
@@ -251,51 +254,67 @@ class MazeRunner:
     def breadth_first_search(self, level):
 
         q = queue()
+        self.secret_code = None
+
 
         start = self.map.get_start()
         q.append(start)
 
         visited = set()
+        block_rooms = set()
 
         exits = []
-
-        shortest_found = False
 
         while q:
             room = q.popleft()
 
-            visited.add(room)
+            if room in visited:
+                continue
+            else:
+                visited.add(room)
 
+            print(f"Checking {room.x},{room.y}")
             for d in self.dirs:
                 neighbor = room.neighbor(d)
 
                 if neighbor in visited:
                     continue
 
+                if self.thick_walls and neighbor in block_rooms:
+                    room.walls[d] = True
+                    continue
+                    
+                room_marker = self.draw_room(neighbor)
                 valid = self.map.check_path(neighbor.path)
+                self.canvas.delete(room_marker)
 
                 if valid == "Open Space":
                     room.walls[d] = False
+                    neighbor.rtype = "_"
                     q.append(neighbor)
+                    print(f"{d} is open")
+
                 elif valid == "Wall":
                     room.walls[d] = True
+                    if self.thick_walls:
+                        block_rooms.add(neighbor)
+                    print(f"{d} is wall")
                     continue
                 else:
-                    room.rtype = "X"
-                    print(valid)
+                    room.walls[d] = False
+                    neighbor.rtype = "X"
+                    self.draw_room(neighbor)
+                    
+                    print(f"{d} is exit")
+
                     exits.append(neighbor.path)
+                    visited.add(neighbor)
 
-                    if not shortest_found:
-                        shortest_found = True
+                    if not self.secret_code:
+                        self.secret_code = valid
+                        
 
-                        last = start
-                        for step in neighbor.path[:-1]:
-                            if last.x == 0 and last.y == 0:
-                                last = last.neighbor(step)
-                                continue
-                            last.rtype = step
-                            self.draw_room(last)
-                            last = last.neighbor(step)
+
 
 
             self.draw_room(room)
@@ -310,8 +329,10 @@ class MazeRunner:
 
         self.canvas.width = 600
 
-        if room.rtype == "@":
-            self.canvas.create_rectangle(tlx, tly, brx, bry, fill="green")
+
+        shape_id = None
+        if room.rtype == "?":
+            shape_id = self.canvas.create_rectangle(tlx, tly, brx, bry, fill="purple")
         elif room.rtype == "#":
             self.canvas.create_rectangle(tlx, tly, brx, bry, fill="black")
         elif room.rtype == "X":
@@ -321,7 +342,13 @@ class MazeRunner:
             angle = self.arrows[room.rtype]
             self.canvas.create_text(tlx+10, tly+10, text="➤", angle=angle, fill="dark green", font=("Helvetica", 12))
         else:
-            self.canvas.create_rectangle(tlx, tly, brx, bry, fill="white", outline="")
+            print(f"Drawing {room.x},{room.y}")
+            print()
+
+            if room.rtype == "@":
+                self.canvas.create_rectangle(tlx, tly, brx, bry, fill="green")
+            else:
+                self.canvas.create_rectangle(tlx, tly, brx, bry, fill="white", outline="")
             
             if room.walls['N']:
                 self.canvas.create_line(tlx, tly, brx, tly, width=2)
@@ -335,13 +362,26 @@ class MazeRunner:
         
         self.canvas.update_idletasks()
         self.canvas.update()
+        return shape_id
 
     def start_mapping(self):
         self.canvas.delete("all")
         level = self.level_chooser.get()
         self.map.set_level(level)
         result = self.breadth_first_search(level)
-        print(f"Level {level} ", result)    
+        shortest = result[0]
+
+        last = self.map.get_start()
+        for step in shortest:
+            if last.x == 0 and last.y == 0:
+                last = last.neighbor(step)
+                continue
+            last.rtype = step
+            self.draw_room(last)
+            last = last.neighbor(step)
+
+        print(f"Level {level} ", shortest)
+        print(self.secret_code)  
 
 def main(argv):
     #map = PNGMap("/Users/wbustraa/Downloads/40 by 20 orthogonal maze.png")
